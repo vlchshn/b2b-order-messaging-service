@@ -1,11 +1,17 @@
+from contextlib import asynccontextmanager
 from typing import List
 
 from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi_cache import FastAPICache
+from fastapi_cache.backends.redis import RedisBackend
+from fastapi_cache.decorator import cache
+from redis import asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db, get_current_user
+from app.core.config import settings
 from app.core.security import verify_password, create_access_token
 from app.core.ws_manager import manager
 from app.crud.message import create_message, get_messages_by_order
@@ -17,10 +23,23 @@ from app.schemas.order import OrderCreate, OrderResponse
 from app.schemas.token import Token
 from app.schemas.user import UserCreate, UserResponse
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """
+    Application lifespan context manager.
+    Initializes Redis connection pool and caching backend on startup.
+    """
+    redis = aioredis.from_url(settings.REDIS_URL, encoding="utf8", decode_responses=True)
+    FastAPICache.init(RedisBackend(redis), prefix="b2b-cache")
+    yield
+
+
 app = FastAPI(
     title="B2B Order Messaging Service",
     description="Core API for B2B orders and real-time communication",
-    version="0.1.0"
+    version="0.1.0",
+    lifespan=lifespan
 )
 
 
@@ -78,10 +97,15 @@ async def create_new_order(
 
 
 @app.get("/orders", response_model=List[OrderResponse], tags=["Orders"])
+@cache(expire=60)
 async def read_user_orders(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
+    """
+    Retrieve a list of orders for the authenticated user.
+    Responses are cached in Redis for 60 seconds to reduce database load and improve latency.
+    """
     return await get_user_orders(db=db, current_user=current_user)
 
 
@@ -110,12 +134,17 @@ async def send_message(
     return db_message
 
 
-@app.get("/orders/{order_id}/messages", response_model=List[MessageResponse], tags=["Messages"])
+@app.get(
+    "/orders/{order_id}/messages",
+    response_model=List[MessageResponse],
+    tags=["Messages"],
+    dependencies=[Depends(get_current_user)]
+)
 async def read_messages(
         order_id: str,
-        db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+        db: AsyncSession = Depends(get_db)
 ):
+    """Retrieve message history for a specific order room. Requires authentication via dependencies."""
     return await get_messages_by_order(db=db, order_id=order_id)
 
 
