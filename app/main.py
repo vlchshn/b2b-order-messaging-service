@@ -22,6 +22,7 @@ from app.schemas.message import MessageCreate, MessageResponse
 from app.schemas.order import OrderCreate, OrderResponse
 from app.schemas.token import Token
 from app.schemas.user import UserCreate, UserResponse
+from app.worker import process_order_background
 
 
 @asynccontextmanager
@@ -93,7 +94,12 @@ async def create_new_order(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    return await create_order(db=db, order=order, current_user=current_user)
+    db_order = await create_order(db=db, order=order, current_user=current_user)
+
+    # Dispatch heavy processing to Celery background worker
+    process_order_background.delay(str(db_order.id), current_user.email)
+
+    return db_order
 
 
 @app.get("/orders", response_model=List[OrderResponse], tags=["Orders"])
@@ -118,7 +124,9 @@ async def send_message(
         db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    """Save a new message to the database and broadcast it to all active WebSocket clients in the order room."""
+    """
+    Save a new message to the database and broadcast it to all active WebSocket clients in the order room.
+    """
     db_message = await create_message(db=db, message=message, order_id=order_id, current_user=current_user)
 
     message_data = {
@@ -144,7 +152,10 @@ async def read_messages(
         order_id: str,
         db: AsyncSession = Depends(get_db)
 ):
-    """Retrieve message history for a specific order room. Requires authentication via dependencies."""
+    """
+    Retrieve message history for a specific order room.
+    Requires authentication via dependencies.
+    """
     return await get_messages_by_order(db=db, order_id=order_id)
 
 
@@ -152,7 +163,9 @@ async def read_messages(
 
 @app.websocket("/ws/orders/{order_id}")
 async def websocket_endpoint(websocket: WebSocket, order_id: str):
-    """Establish a persistent WebSocket connection for real-time order communication."""
+    """
+    Establish a persistent WebSocket connection for real-time order communication.
+    """
     await manager.connect(websocket, order_id)
     try:
         while True:
