@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B2B Core - WS Diagnostics</title>
+    <style>
+        :root {
+            --bg-color: #f0f2f5;
+            --panel-bg: #ffffff;
+            --border: #d1d5db;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --danger: #dc2626;
+            --danger-hover: #b91c1c;
+            --success: #059669;
+        }
+        body {
+            font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            font-size: 14px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 16px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .panel-title {
+            margin: 0 0 16px 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-main);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: var(--text-main);
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 13px;
+        }
+        textarea {
+            resize: vertical;
+            min-height: 120px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        button {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
+        .btn-default { background: #e5e7eb; color: var(--text-main); }
+        .btn-default:hover:not(:disabled) { background: #d1d5db; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        #connectionStatus {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            background: #e5e7eb;
+            color: var(--text-muted);
+        }
+        #connectionStatus.connected { background: #d1fae5; color: var(--success); }
+        #connectionStatus.error { background: #fee2e2; color: var(--danger); }
+
+        .log-container {
+            height: calc(100vh - 120px);
+            overflow-y: auto;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .log-entry { margin-bottom: 4px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+        .log-time { color: #858585; user-select: none; }
+        .log-type-system { color: #569cd6; }
+        .log-type-rx { color: #4ec9b0; }
+        .log-type-tx { color: #ce9178; }
+        .log-type-error { color: #f48771; }
+        pre { margin: 4px 0 0 24px; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Configuration Panel -->
+        <div class="left-col">
+            <div class="panel" style="margin-bottom: 20px;">
+                <h2 class="panel-title">
+                    Connection Config
+                    <span id="connectionStatus">DISCONNECTED</span>
+                </h2>
+                <div class="form-group">
+                    <label for="wsUrl">Base WebSocket URL:</label>
+                    <input type="text" id="wsUrl" value="ws://127.0.0.1:8000/ws/orders/">
+                </div>
+                <div class="form-group">
+                    <label for="orderId">Target Order ID:</label>
+                    <input type="text" id="orderId" placeholder="UUID">
+                </div>
+                <div class="btn-group">
+                    <button id="btnConnect" class="btn-primary" onclick="app.connect()">Connect</button>
+                    <button id="btnDisconnect" class="btn-danger" onclick="app.disconnect()" disabled>Disconnect</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2 class="panel-title">Transmit Payload</h2>
+                <div class="form-group">
+                    <label for="payloadInput">JSON Payload:</label>
+                    <textarea id="payloadInput">{"text": "Diagnostic test message"}</textarea>
+                </div>
+                <button id="btnSend" class="btn-primary" style="width: 100%;" onclick="app.send()" disabled>Send Message</button>
+            </div>
+        </div>
+
+        <!-- Logs Panel -->
+        <div class="panel">
+            <h2 class="panel-title">
+                Event Stream
+                <button class="btn-default" style="padding: 2px 8px;" onclick="app.clearLogs()">Clear</button>
+            </h2>
+            <div id="logs" class="log-container"></div>
+        </div>
+    </div>
+
+    <script>
+        const app = {
+            ws: null,
+            ui: {
+                btnConnect: document.getElementById('btnConnect'),
+                btnDisconnect: document.getElementById('btnDisconnect'),
+                btnSend: document.getElementById('btnSend'),
+                statusBadge: document.getElementById('connectionStatus'),
+                logsDiv: document.getElementById('logs'),
+                payloadInput: document.getElementById('payloadInput')
+            },
+
+            getTimestamp() {
+                const now = new Date();
+                return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}.${now.getMilliseconds().toString().padStart(3, '0')}`;
+            },
+
+            log(message, type = 'system', data = null) {
+                const el = document.createElement('div');
+                el.className = 'log-entry';
+
+                let logPrefix = '[SYS]';
+                if (type === 'rx') logPrefix = '[RX] ';
+                if (type === 'tx') logPrefix = '[TX] ';
+                if (type === 'error') logPrefix = '[ERR]';
+
+                let htmlContent = `<span class="log-time">[${this.getTimestamp()}]</span> <span class="log-type-${type}">${logPrefix} ${message}</span>`;
+
+                if (data) {
+                    try {
+                        const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+                        htmlContent += `<pre>${JSON.stringify(parsed, null, 2)}</pre>`;
+                    } catch (e) {
+                        htmlContent += `<pre>${data}</pre>`;
+                    }
+                }
+
+                el.innerHTML = htmlContent;
+                this.ui.logsDiv.appendChild(el);
+                this.ui.logsDiv.scrollTop = this.ui.logsDiv.scrollHeight;
+            },
+
+            clearLogs() {
+                this.ui.logsDiv.innerHTML = '';
+            },
+
+            setUIState(isConnected) {
+                this.ui.btnConnect.disabled = isConnected;
+                this.ui.btnDisconnect.disabled = !isConnected;
+                this.ui.btnSend.disabled = !isConnected;
+
+                document.getElementById('wsUrl').disabled = isConnected;
+                document.getElementById('orderId').disabled = isConnected;
+
+                if (isConnected) {
+                    this.ui.statusBadge.textContent = 'CONNECTED';
+                    this.ui.statusBadge.className = 'connected';
+                } else {
+                    this.ui.statusBadge.textContent = 'DISCONNECTED';
+                    this.ui.statusBadge.className = '';
+                }
+            },
+
+            connect() {
+                const baseUrl = document.getElementById('wsUrl').value.trim();
+                const orderId = document.getElementById('orderId').value.trim();
+
+                if (!baseUrl || !orderId) {
+                    this.log('Configuration error: Base URL and Order ID are required', 'error');
+                    return;
+                }
+
+                const fullUrl = baseUrl.endsWith('/') ? `${baseUrl}${orderId}` : `${baseUrl}/${orderId}`;
+
+                this.log(`Initializing connection to ${fullUrl}...`, 'system');
+
+                try {
+                    this.ws = new WebSocket(fullUrl);
+
+                    this.ws.onopen = () => {
+                        this.log('WebSocket connection established successfully', 'system');
+                        this.setUIState(true);
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        this.log('Message received', 'rx', event.data);
+                    };
+
+                    this.ws.onclose = (event) => {
+                        this.log(`Connection closed (Code: ${event.code}, Clean: ${event.wasClean})`, 'system');
+                        this.setUIState(false);
+                        this.ws = null;
+                    };
+
+                    this.ws.onerror = (error) => {
+                        this.log('WebSocket connection error', 'error');
+                        this.ui.statusBadge.className = 'error';
+                        this.ui.statusBadge.textContent = 'ERROR';
+                    };
+                } catch (e) {
+                    this.log(`Failed to initialize WebSocket: ${e.message}`, 'error');
+                }
+            },
+
+            disconnect() {
+                if (this.ws) {
+                    this.log('Client requested disconnect...', 'system');
+                    this.ws.close();
+                }
+            },
+
+            send() {
+                if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+                    this.log('Cannot send: WebSocket is not open', 'error');
+                    return;
+                }
+
+                const rawPayload = this.ui.payloadInput.value;
+                if (!rawPayload.trim()) return;
+
+                // Validate JSON before sending (optional QA constraint)
+                try {
+                    JSON.parse(rawPayload);
+                } catch (e) {
+                    this.log('Warning: Payload is not valid JSON. Transmitting as plain text.', 'error');
+                }
+
+                this.ws.send(rawPayload);
+                this.log('Message transmitted', 'tx', rawPayload);
+            }
+        };
+    </script>
+</body>
+</html>
