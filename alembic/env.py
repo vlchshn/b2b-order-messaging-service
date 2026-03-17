@@ -12,8 +12,8 @@ from app.models.base import Base
 
 # Imports for Alembic to detect tables via Base.metadata
 from app.models.message import Message  # noqa
-from app.models.order import Order      # noqa
-from app.models.user import User        # noqa
+from app.models.order import Order  # noqa
+from app.models.user import User  # noqa
 
 # Windows-specific asyncio event loop policy
 if sys.platform == "win32":
@@ -57,7 +57,7 @@ async def run_async_migrations() -> None:
         poolclass=pool.NullPool,
         connect_args={
             "command_timeout": 60,
-        }
+        },
     )
 
     try:

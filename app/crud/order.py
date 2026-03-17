@@ -6,12 +6,12 @@ from app.models.user import User
 from app.schemas.order import OrderCreate
 
 
-async def create_order(db: AsyncSession, order: OrderCreate, current_user: User) -> Order:
+async def create_order(
+    db: AsyncSession, order: OrderCreate, current_user: User
+) -> Order:
     """Create a new order and associate it with the current user."""
     db_order = Order(
-        title=order.title,
-        description=order.description,
-        owner_id=current_user.id
+        title=order.title, description=order.description, owner_id=current_user.id
     )
 
     db.add(db_order)

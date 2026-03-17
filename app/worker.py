@@ -4,11 +4,7 @@ from celery import Celery
 
 from app.core.config import settings
 
-celery_app = Celery(
-    "b2b_tasks",
-    broker=settings.REDIS_URL,
-    backend=settings.REDIS_URL
-)
+celery_app = Celery("b2b_tasks", broker=settings.REDIS_URL, backend=settings.REDIS_URL)
 
 celery_app.conf.update(
     task_serializer="json",
@@ -27,4 +23,6 @@ def process_order_background(order_id: str, user_email: str) -> str:
     # Simulated I/O-bound operations
     time.sleep(3)
 
-    return f"Order {order_id} successfully processed. Confirmation sent to {user_email}."
+    return (
+        f"Order {order_id} successfully processed. Confirmation sent to {user_email}."
+    )

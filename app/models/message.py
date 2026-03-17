@@ -11,11 +11,17 @@ class Message(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
     text = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
-    sender_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    sender_id = Column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
 
-    order_id = Column(String, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    order_id = Column(
+        String, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False
+    )
 
     sender = relationship("User", back_populates="messages")
     order = relationship("Order", back_populates="messages")

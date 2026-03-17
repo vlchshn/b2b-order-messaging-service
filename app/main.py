@@ -31,7 +31,9 @@ async def lifespan(_app: FastAPI):
     Application lifespan context manager.
     Initializes Redis connection pool and caching backend on startup.
     """
-    redis = aioredis.from_url(settings.REDIS_URL, encoding="utf8", decode_responses=True)
+    redis = aioredis.from_url(
+        settings.REDIS_URL, encoding="utf8", decode_responses=True
+    )
     FastAPICache.init(RedisBackend(redis), prefix="b2b-cache")
     yield
 
@@ -40,7 +42,7 @@ app = FastAPI(
     title="B2B Order Messaging Service",
     description="Core API for B2B orders and real-time communication",
     version="0.1.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 
@@ -57,6 +59,7 @@ async def health_check():
 
 # --- Users ---
 
+
 @app.post("/users/register", response_model=UserResponse, tags=["Users"])
 async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
     db_user = await get_user_by_email(db, email=user.email)
@@ -67,15 +70,14 @@ async def register_user(user: UserCreate, db: AsyncSession = Depends(get_db)):
 
 @app.post("/users/login", response_model=Token, tags=["Users"])
 async def login_for_access_token(
-        form_data: OAuth2PasswordRequestForm = Depends(),
-        db: AsyncSession = Depends(get_db)
+    form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)
 ):
     user = await get_user_by_email(db, email=form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=401,
             detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"}
+            headers={"WWW-Authenticate": "Bearer"},
         )
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
@@ -88,11 +90,12 @@ async def read_users_me(current_user: User = Depends(get_current_user)):
 
 # --- Orders ---
 
+
 @app.post("/orders", response_model=OrderResponse, tags=["Orders"])
 async def create_new_order(
-        order: OrderCreate,
-        db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+    order: OrderCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     db_order = await create_order(db=db, order=order, current_user=current_user)
 
@@ -105,8 +108,7 @@ async def create_new_order(
 @app.get("/orders", response_model=List[OrderResponse], tags=["Orders"])
 @cache(expire=60)
 async def read_user_orders(
-        db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     Retrieve a list of orders for the authenticated user.
@@ -117,24 +119,29 @@ async def read_user_orders(
 
 # --- Messages ---
 
-@app.post("/orders/{order_id}/messages", response_model=MessageResponse, tags=["Messages"])
+
+@app.post(
+    "/orders/{order_id}/messages", response_model=MessageResponse, tags=["Messages"]
+)
 async def send_message(
-        order_id: str,
-        message: MessageCreate,
-        db: AsyncSession = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+    order_id: str,
+    message: MessageCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """
     Save a new message to the database and broadcast it to all active WebSocket clients in the order room.
     """
-    db_message = await create_message(db=db, message=message, order_id=order_id, current_user=current_user)
+    db_message = await create_message(
+        db=db, message=message, order_id=order_id, current_user=current_user
+    )
 
     message_data = {
         "id": str(db_message.id),
         "text": db_message.text,
         "sender_id": str(db_message.sender_id),
         "order_id": str(db_message.order_id),
-        "created_at": db_message.created_at.isoformat()
+        "created_at": db_message.created_at.isoformat(),
     }
 
     await manager.broadcast_to_order(message_data=message_data, order_id=order_id)
@@ -146,12 +153,9 @@ async def send_message(
     "/orders/{order_id}/messages",
     response_model=List[MessageResponse],
     tags=["Messages"],
-    dependencies=[Depends(get_current_user)]
+    dependencies=[Depends(get_current_user)],
 )
-async def read_messages(
-        order_id: str,
-        db: AsyncSession = Depends(get_db)
-):
+async def read_messages(order_id: str, db: AsyncSession = Depends(get_db)):
     """
     Retrieve message history for a specific order room.
     Requires authentication via dependencies.
@@ -160,6 +164,7 @@ async def read_messages(
 
 
 # --- WebSockets ---
+
 
 @app.websocket("/ws/orders/{order_id}")
 async def websocket_endpoint(websocket: WebSocket, order_id: str):

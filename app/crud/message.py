@@ -7,16 +7,11 @@ from app.schemas.message import MessageCreate
 
 
 async def create_message(
-        db: AsyncSession,
-        message: MessageCreate,
-        order_id: str,
-        current_user: User
+    db: AsyncSession, message: MessageCreate, order_id: str, current_user: User
 ) -> Message:
     """Create a new message linked to an order and the current user."""
     db_message = Message(
-        text=message.text,
-        sender_id=current_user.id,
-        order_id=order_id
+        text=message.text, sender_id=current_user.id, order_id=order_id
     )
 
     db.add(db_message)

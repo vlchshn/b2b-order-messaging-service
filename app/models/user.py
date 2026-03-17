@@ -6,6 +6,7 @@ from sqlalchemy.orm import relationship
 
 from app.models.base import Base
 
+
 class User(Base):
     __tablename__ = "users"
 
@@ -14,8 +15,12 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(String, default="client")
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at = Column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
 
     orders = relationship("Order", back_populates="owner", cascade="all, delete-orphan")
 
-    messages = relationship("Message", back_populates="sender", cascade="all, delete-orphan")
+    messages = relationship(
+        "Message", back_populates="sender", cascade="all, delete-orphan"
+    )
